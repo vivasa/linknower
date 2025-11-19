@@ -27,6 +27,16 @@ app = typer.Typer(
 console = Console()
 
 
+def load_config() -> Config:
+    """Load configuration from file or create default."""
+    config = Config()
+    config_path = config.get_config_path()
+    
+    if config_path.exists():
+        return Config.from_file(config_path)
+    return config
+
+
 def get_services(config: Config):
     """Initialize and return all services."""
     # Repositories
@@ -69,7 +79,7 @@ def get_services(config: Config):
 @app.command()
 def init():
     """Initialize LinkNower configuration."""
-    config = Config()
+    config = load_config()
     config_path = config.get_config_path()
 
     if config_path.exists():
@@ -90,12 +100,12 @@ def sync(
     full: bool = typer.Option(False, "--full", help="Perform full sync of all data"),
 ):
     """Sync data from configured sources."""
-    config = Config()
+    config = load_config()
+    config_path = config.get_config_path()
 
-    if not config.get_config_path().exists():
+    if not config_path.exists():
         console.print("[red]Error:[/red] Not initialized. Run [cyan]lk init[/cyan] first.")
         raise typer.Exit(1)
-
     services = get_services(config)
     sync_service = services["sync"]
 
@@ -124,7 +134,7 @@ def search(
     ),
 ):
     """Search for events semantically similar to query."""
-    config = Config()
+    config = load_config()
     services = get_services(config)
     search_service = services["search"]
 
@@ -176,7 +186,7 @@ def timeline(
     date: Optional[str] = typer.Option(None, "--date", help="Specific date (YYYY-MM-DD)"),
 ):
     """View contextual timeline of activities."""
-    config = Config()
+    config = load_config()
     services = get_services(config)
     timeline_service = services["timeline"]
 
@@ -224,7 +234,7 @@ def timeline(
 @app.command()
 def cluster():
     """Manage activity clusters."""
-    config = Config()
+    config = load_config()
     services = get_services(config)
     cluster_service = services["cluster"]
 
@@ -270,7 +280,7 @@ def cluster():
 @app.command()
 def stats():
     """Display statistics about indexed data."""
-    config = Config()
+    config = load_config()
     services = get_services(config)
     stats_service = services["stats"]
 
@@ -290,14 +300,14 @@ def stats():
     console.print(table)
 
 
-@app.command()
+@app.command(name="config")
 def config_cmd(
     show: bool = typer.Option(False, "--show", help="Show current configuration"),
     edit: bool = typer.Option(False, "--edit", help="Edit configuration file"),
     add_repo: Optional[str] = typer.Option(None, "--add-repo", help="Add git repository"),
 ):
     """Manage configuration."""
-    config = Config()
+    config = load_config()
     config_path = config.get_config_path()
 
     if show:

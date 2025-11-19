@@ -124,32 +124,45 @@ class SyncService:
         total = 0
 
         for repo_path in self.config.git_repos:
-            path = Path(repo_path).expanduser()
+            path = Path(repo_path).expanduser().resolve()
             if not path.exists():
+                print(f"Warning: Git repo path does not exist: {path}")
                 continue
 
-            parser = GitParser(path)
-            events = []
+            if not (path / ".git").exists():
+                print(f"Warning: Not a git repository: {path}")
+                continue
 
-            for event in parser.parse():
-                # Apply privacy filter
-                if not self.privacy_filter.is_allowed(event.content):
-                    continue
+            try:
+                parser = GitParser(path)
+                events = []
 
-                events.append(event)
+                for event in parser.parse():
+                    # Apply privacy filter
+                    if not self.privacy_filter.is_allowed(event.content):
+                        continue
 
-            # Save events and generate embeddings
-            if events:
-                self.event_repo.save_many(events)
-                embeddings = self.embedding_engine.embed_events(events)
-                self.embedding_repo.save_many(embeddings)
+                    events.append(event)
 
-                # Update events with embedding IDs
-                for event, embedding in zip(events, embeddings):
-                    event.embedding_id = embedding.id
-                self.event_repo.save_many(events)
+                # Save events and generate embeddings
+                if events:
+                    self.event_repo.save_many(events)
+                    embeddings = self.embedding_engine.embed_events(events)
+                    self.embedding_repo.save_many(embeddings)
 
-                total += len(events)
+                    # Update events with embedding IDs
+                    for event, embedding in zip(events, embeddings):
+                        event.embedding_id = embedding.id
+                    self.event_repo.save_many(events)
+
+                    total += len(events)
+                    print(f"Synced {len(events)} commits from {path}")
+                else:
+                    print(f"No commits found in {path}")
+            except Exception as e:
+                print(f"Error syncing git repo {path}: {e}")
+                import traceback
+                traceback.print_exc()
 
         return total
 
