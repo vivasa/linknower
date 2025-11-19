@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+include SPEC.md
+include FUNCTIONAL_SPEC.md
+include ARCHITECTURE.md
+include DESIGN.md
+include DOCS_INDEX.md
+recursive-include src/linknower *.py
+recursive-include src/linknower py.typed
