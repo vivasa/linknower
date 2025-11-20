@@ -1,5 +1,6 @@
 """Application services for orchestrating business logic."""
 
+import glob
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -60,7 +61,45 @@ class SyncService:
 
     def sync_browser(self, full: bool = False) -> int:
         """Sync browser history."""
-        profile_path = Path(self.config.zen_profile_path).expanduser()
+        import re
+
+        # Expand user home directory first
+        profile_pattern = str(Path(self.config.zen_profile_path).expanduser())
+
+        # Use glob to resolve wildcard patterns
+        # For paths with wildcards in the basename, need to get parent and filter
+        pattern_path = Path(profile_pattern)
+        if '*' in pattern_path.name:
+            # Get all directories in parent, then filter by pattern (case-insensitive)
+            parent_dir = pattern_path.parent
+            if parent_dir.exists():
+                pattern_name = pattern_path.name.replace('*', '.*')
+                matching_profiles = [
+                    str(p) for p in parent_dir.iterdir()
+                    if p.is_dir() and re.match(pattern_name, p.name, re.IGNORECASE)
+                ]
+            else:
+                matching_profiles = []
+        else:
+            matching_profiles = glob.glob(profile_pattern)
+
+        if not matching_profiles:
+            print(f"Warning: No browser profiles found matching: {profile_pattern}")
+            return 0
+
+        # Filter for profiles that have places.sqlite database
+        valid_profiles = [
+            p for p in matching_profiles
+            if (Path(p) / "places.sqlite").exists()
+        ]
+
+        if not valid_profiles:
+            print(f"Warning: No browser profiles with places.sqlite found")
+            return 0
+
+        # Use the first valid profile
+        profile_path = Path(valid_profiles[0])
+        print(f"Using browser profile: {profile_path}")
 
         if not profile_path.exists():
             return 0

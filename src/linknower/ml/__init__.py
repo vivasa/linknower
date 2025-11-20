@@ -1,7 +1,12 @@
 """Machine learning components for semantic search and clustering."""
 
+import os
 from datetime import datetime
 from typing import Optional
+
+# Disable tokenizers parallelism to avoid fork warnings
+# Must be set before importing sentence_transformers
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import hdbscan
 import numpy as np
@@ -55,17 +60,27 @@ class EmbeddingEngine:
 
     def embed_events(self, events: list[Event]) -> list[Embedding]:
         """Generate embeddings for multiple events efficiently."""
-        texts = [e.content for e in events]
-        vectors = self.embed_many(texts)
+        # Process in chunks to avoid exceeding model's max batch size
+        # SentenceTransformer has internal limits (~5000-6000 depending on model)
+        chunk_size = 1000
+        all_embeddings = []
 
-        return [
-            Embedding(
-                event_id=event.id,
-                vector=vector,
-                model=self.model_name,
-            )
-            for event, vector in zip(events, vectors)
-        ]
+        for i in range(0, len(events), chunk_size):
+            chunk_events = events[i:i + chunk_size]
+            texts = [e.content for e in chunk_events]
+            vectors = self.embed_many(texts)
+
+            chunk_embeddings = [
+                Embedding(
+                    event_id=event.id,
+                    vector=vector,
+                    model=self.model_name,
+                )
+                for event, vector in zip(chunk_events, vectors)
+            ]
+            all_embeddings.extend(chunk_embeddings)
+
+        return all_embeddings
 
 
 class FeatureEngineer:

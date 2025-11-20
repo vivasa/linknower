@@ -34,8 +34,28 @@ class ZenBrowserParser(EventParser):
 
     def parse(self) -> Iterator[Event]:
         """Parse browsing history from SQLite database."""
-        # Connect in read-only mode to avoid locking issues
-        conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+        import shutil
+        import tempfile
+
+        # Always copy the database to avoid locking issues with active browser
+        # Browser databases are frequently locked, so copying is safer
+        temp_db_file = tempfile.NamedTemporaryFile(suffix='.sqlite', delete=False)
+        temp_db_file.close()
+
+        try:
+            shutil.copy2(self.db_path, temp_db_file.name)
+        except Exception as e:
+            # Clean up and re-raise
+            try:
+                Path(temp_db_file.name).unlink()
+            except Exception:
+                pass
+            raise Exception(f"Failed to copy browser database: {e}")
+
+        db_to_use = Path(temp_db_file.name)
+
+        # Connect to the temp database copy
+        conn = sqlite3.connect(f"file:{db_to_use}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
 
         try:
@@ -74,6 +94,11 @@ class ZenBrowserParser(EventParser):
                 )
         finally:
             conn.close()
+            # Clean up temp file
+            try:
+                Path(temp_db_file.name).unlink()
+            except Exception:
+                pass
 
 
 class ZshHistoryParser(EventParser):

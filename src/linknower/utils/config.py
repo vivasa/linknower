@@ -21,7 +21,7 @@ class Config(BaseSettings):
     # Data paths
     data_dir: Path = Field(default=Path.home() / ".linknower")
     zen_profile_path: str = Field(
-        default="~/Library/Application Support/Zen/Profiles/*.default-release"
+        default="~/Library/Application Support/Zen/Profiles/*default*"
     )
     zsh_history_path: str = Field(default="~/.zsh_history")
     git_repos: list[str] = Field(default_factory=list)
